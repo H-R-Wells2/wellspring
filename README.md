@@ -1,56 +1,43 @@
-# Welcome to your Expo app 👋
+# Wellspring
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Wellspring by HRWells: a personal, Reels-style player for the vertical videos on your Android phone. Built with Expo (SDK 58) and runs in Expo Go.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Run it
 
 ```bash
-npm run reset-project
+npm install
+npx expo start          # same Wi-Fi as the phone
+npx expo start --tunnel # if LAN doesn't work
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+Open **Expo Go** on the phone (signed in to the same Expo account) and scan the QR code.
 
-### Other setup steps
+## Using it
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+- **Home:** your folders as a wall, each block filled with its own reels and sized by how many it holds. **Tap** folders to mix them, then **Play** in the dock. **Hold** a folder to play just that one. **Everything** plays the whole library, and the shuffle button sits next to it.
+- **Add folders** from Settings (for example `Download/Instagram`). Videos play in place and nothing is copied.
 
-## Learn more
+| On a reel | Action |
+| --- | --- |
+| Swipe up / down | Next / previous reel |
+| Tap | Pause / play |
+| Press and hold | 2× with natural-pitch audio; slide left/right to set 1.25×–3× |
+| Pinch, or the Fit/Fill button | Whole frame or fill the screen, remembered per video |
+| Drag the bottom bar | Scrub |
+| Collect | Add to one of your collections |
+| ••• | Repeat a section (A–B), mark seen, hide, delete |
 
-To learn more about developing your project with Expo, look at the following resources:
+Every video is shown whole (fit) by default. Feed order (newest, unseen first, shuffle, oldest), ambient glow and what happens when a reel ends are all in Settings.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Brand files are in `assets/brand/`.
 
-## Join the community
+## Code map
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- `src/app/index.tsx`: Home, the folder wall (`src/lib/wall.ts` lays it out)
+- `src/app/play.tsx`: the feed (paging list; only the current reel and its neighbours hold a player)
+- `src/components/ReelItem.tsx`: player, gestures, overlay
+- `src/components/ProgressBar.tsx`: scrubber
+- `src/store/library.ts`: library state, persisted to AsyncStorage
+- `src/lib/sources.ts`: folder and file picking, scanning
+- `src/lib/thumbs.ts`: poster frames
+- `src/theme.ts`: colours, fonts, spacing
