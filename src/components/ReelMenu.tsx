@@ -1,8 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale } from '@/components/PressableScale';
+import { shareVideo } from '@/lib/share';
 import { deleteFromDevice } from '@/lib/sources';
 import { getState, hideVideo, setState, updateVideo, useLibrary } from '@/store/library';
 import { colors, fonts, formatTime, radius, space } from '@/theme';
@@ -21,6 +23,20 @@ export function ReelMenu({
 }) {
   const insets = useSafeAreaInsets();
   const video = useLibrary((s) => (id ? s.videos[id] : undefined));
+
+  const [sharing, setSharing] = useState(false);
+  const share = async () => {
+    if (!video || sharing) return;
+    setSharing(true);
+    try {
+      await shareVideo(video.uri, video.name);
+      onClose();
+    } catch {
+      Alert.alert("Couldn't share this video", 'The file may have moved or be unreadable. Try a rescan from Settings.');
+    } finally {
+      setSharing(false);
+    }
+  };
 
   const remove = () => {
     if (!id) return;
@@ -107,6 +123,12 @@ export function ReelMenu({
             label={video.watched ? 'Mark as unseen' : 'Mark as seen'}
             onPress={() => updateVideo(video.id, { watched: !video.watched })}
           />
+          <Row
+            icon="share-social-outline"
+            label={sharing ? 'Preparing to share…' : 'Share'}
+            busy={sharing}
+            onPress={share}
+          />
           <Row icon="eye-off-outline" label="Hide from Wellspring" onPress={remove} />
           <Row icon="trash-outline" label="Delete from phone" danger onPress={del} />
         </View>
@@ -128,17 +150,19 @@ function Row({
   icon,
   label,
   danger,
+  busy,
   onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   danger?: boolean;
+  busy?: boolean;
   onPress: () => void;
 }) {
   const c = danger ? colors.danger : colors.text;
   return (
-    <PressableScale onPress={onPress} scaleTo={0.98} style={styles.row}>
-      <Ionicons name={icon} size={22} color={c} />
+    <PressableScale onPress={onPress} scaleTo={0.98} style={styles.row} disabled={busy}>
+      {busy ? <ActivityIndicator size="small" color={colors.accent} style={{ width: 22 }} /> : <Ionicons name={icon} size={22} color={c} />}
       <Text style={[styles.rowLabel, { color: c }]}>{label}</Text>
     </PressableScale>
   );

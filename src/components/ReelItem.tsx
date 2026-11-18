@@ -129,6 +129,9 @@ function ReelPlayer(props: Props) {
   const pausedIcon = useSharedValue(0);
   const [liveSpeed, setLiveSpeed] = useState(holdSpeed);
   const holdActive = useRef(false);
+  // Speed lock: slide down while holding to keep the speed after you let go.
+  const [locked, setLocked] = useState(false);
+  const lockedRef = useRef(false);
   const holdBase = useRef(holdSpeed);
   const liveRef = useRef(holdSpeed);
   const [draftA, setDraftA] = useState<number | null>(null);
@@ -221,8 +224,17 @@ function ReelPlayer(props: Props) {
   const [wasActive, setWasActive] = useState(isActive);
   if (wasActive !== isActive) {
     setWasActive(isActive);
-    if (!isActive) setUserPaused(false);
+    if (!isActive) {
+      setUserPaused(false);
+      setLocked(false);
+    }
   }
+  // Unlocking (or leaving the reel) drops back to normal speed, unless a hold is in progress.
+  useEffect(() => {
+    if (locked) return;
+    lockedRef.current = false;
+    if (!holdActive.current) setPlayer(player, { playbackRate: 1 });
+  }, [locked, player]);
 
   useEffect(() => {
     pausedIcon.set(withTiming(userPaused ? 1 : 0, { duration: userPaused ? 160 : 120, easing: EASE_OUT }));
@@ -231,7 +243,8 @@ function ReelPlayer(props: Props) {
   // ----- gestures -----
   const startHold = () => {
     holdActive.current = true;
-    const base = getState().settings.holdSpeed;
+    // Holding again while locked starts from the locked speed.
+    const base = lockedRef.current ? liveRef.current : getState().settings.holdSpeed;
     holdBase.current = base;
     liveRef.current = base;
     setLiveSpeed(base);
@@ -243,9 +256,20 @@ function ReelPlayer(props: Props) {
     props.onHoldChange(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
-  // While holding, slide right for faster, left for slower: 0.25× per 36pt, 1.25×–3×.
-  const slideHold = (dx: number) => {
+  // While holding: slide right/left for speed (0.25× per 36pt, 1.25×–3×),
+  // slide down to lock it, slide back up to unlock.
+  const LOCK_AT = 72;
+  const slideHold = (dx: number, dy: number) => {
     if (!holdActive.current) return;
+    if (!lockedRef.current && dy > LOCK_AT) {
+      lockedRef.current = true;
+      setLocked(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } else if (lockedRef.current && dy < -LOCK_AT) {
+      lockedRef.current = false;
+      setLocked(false);
+      Haptics.selectionAsync();
+    }
     const raw = holdBase.current + Math.round(dx / 36) * 0.25;
     const next = Math.min(3, Math.max(1.25, raw));
     if (next === liveRef.current) return;
@@ -257,9 +281,13 @@ function ReelPlayer(props: Props) {
   const endHold = () => {
     if (!holdActive.current) return;
     holdActive.current = false;
-    setPlayer(player, { playbackRate: 1 });
+    if (!lockedRef.current) setPlayer(player, { playbackRate: 1 });
     holding.set(withTiming(0, { duration: 180, easing: EASE_OUT }));
     props.onHoldChange(false);
+  };
+  const unlock = () => {
+    Haptics.selectionAsync();
+    setLocked(false);
   };
 
   // ----- A-B repeat -----
@@ -305,7 +333,7 @@ function ReelPlayer(props: Props) {
     activateAfterLongPress: 260,
     runOnJS: true,
     onActivate: () => startHold(),
-    onUpdate: (e) => slideHold(e.translationX),
+    onUpdate: (e) => slideHold(e.translationX, e.translationY),
     onFinalize: () => endHold(),
   });
   const singleTap = useTapGesture({
@@ -374,6 +402,8 @@ function ReelPlayer(props: Props) {
         scrubbing={scrubbing}
         holding={holding}
         holdSpeed={liveSpeed}
+        locked={locked}
+        onUnlock={unlock}
         ab={ab}
         abBar={
           <ABBar
@@ -423,6 +453,8 @@ type ChromeProps = Props & {
   scrubbing?: ReturnType<typeof useSharedValue<boolean>>;
   holding?: ReturnType<typeof useSharedValue<number>>;
   holdSpeed?: number;
+  locked?: boolean;
+  onUnlock?: () => void;
   ab?: [number, number] | null;
   abBar?: React.ReactNode;
 };
@@ -461,12 +493,30 @@ function Chrome(p: ChromeProps) {
           </View>
           <Ionicons name="chevron-forward" size={16} color="rgba(244,239,231,0.55)" />
         </View>
-        <Text style={styles.badgeHint}>Slide to change speed</Text>
+        <View style={styles.lockHintRow}>
+          <Ionicons
+            name={p.locked ? 'lock-closed' : 'chevron-down'}
+            size={13}
+            color={p.locked ? colors.accent : 'rgba(244,239,231,0.6)'}
+          />
+          <Text style={[styles.badgeHint, p.locked && { color: colors.accent }]}>
+            {p.locked ? 'Locked · release to keep' : 'Slide down to lock'}
+          </Text>
+        </View>
       </Animated.View>
 
       <Animated.View
         pointerEvents="box-none"
         style={[StyleSheet.absoluteFill, chromeStyle]}>
+        {p.locked && (
+          <View pointerEvents="box-none" style={[styles.badgeWrap, { top: p.topInset + 64 }]}>
+            <PressableScale style={styles.lockPill} onPress={p.onUnlock} accessibilityLabel="Speed locked. Tap to unlock">
+              <Ionicons name="lock-closed" size={13} color={colors.accentInk} />
+              <Text style={styles.badgeText}>{formatSpeed(p.holdSpeed ?? 2)}×</Text>
+              <Text style={styles.lockPillHint}>tap to unlock</Text>
+            </PressableScale>
+          </View>
+        )}
         <LinearGradient
           pointerEvents="none"
           colors={['transparent', 'rgba(8,7,6,0.35)', 'rgba(8,7,6,0.82)']}
@@ -641,8 +691,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  lockHintRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+  lockPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 36,
+    paddingHorizontal: 14,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
+  },
+  lockPillHint: { fontFamily: fonts.medium, fontSize: 11.5, color: 'rgba(26,11,5,0.7)' },
   badgeHint: {
-    marginTop: 6,
     fontFamily: fonts.medium,
     fontSize: 11.5,
     color: 'rgba(244,239,231,0.6)',

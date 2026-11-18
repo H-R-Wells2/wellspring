@@ -121,7 +121,10 @@ export default function Feed() {
   // Holding for 2× hides the top bar too, so only the video and the speed badge remain.
   const topBarOpacity = useSharedValue(1);
   const topBarStyle = useAnimatedStyle(() => ({ opacity: topBarOpacity.get() }));
+  // While holding, the feed must not scroll: sliding down locks the speed instead.
+  const [holdingNow, setHoldingNow] = useState(false);
   const onHoldChange = (h: boolean) => {
+    setHoldingNow(h);
     topBarOpacity.set(withTiming(h ? 0 : 1, { duration: h ? 140 : 180, easing: EASE_OUT }));
   };
 
@@ -168,6 +171,7 @@ export default function Feed() {
             />
           )}
           extraData={`${active}|${focused}|${appActive}|${menuId}|${collectId}|${size.height}`}
+          scrollEnabled={!holdingNow}
           pagingEnabled
           snapToInterval={size.height}
           snapToAlignment="start"
