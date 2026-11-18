@@ -11,7 +11,8 @@ import { getState, updateVideo } from '@/store/library';
  *   works on what's on screen instead of a backlog of tiles you've scrolled past.
  */
 
-const thumbDir = new Directory(Paths.document, 'thumbs');
+// Created lazily: modules must not touch native file APIs at import time.
+const getThumbDir = () => new Directory(Paths.document, 'thumbs');
 const THUMB_WIDTH = 320;
 const CONCURRENCY = 2;
 const MAX_QUEUE = 48;
@@ -60,6 +61,7 @@ async function generate(id: string) {
   const v = getState().videos[id];
   if (!v || v.thumb) return;
   try {
+    const thumbDir = getThumbDir();
     if (!thumbDir.exists) thumbDir.create({ intermediates: true });
     const frame = await VideoThumbnails.getThumbnailAsync(v.uri, { time: 800, quality: 0.9 });
     const ctx = ImageManipulator.manipulate(frame.uri).resize({ width: THUMB_WIDTH });

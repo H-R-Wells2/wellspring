@@ -9,7 +9,8 @@ import * as Sharing from 'expo-sharing';
  * so at most one shared copy ever sits on disk.
  */
 
-const shareDir = new Directory(Paths.cache, 'share');
+// Created lazily: modules must not touch native file APIs at import time.
+const getShareDir = () => new Directory(Paths.cache, 'share');
 
 const MIME: Record<string, string> = {
   mp4: 'video/mp4',
@@ -38,6 +39,7 @@ export async function shareVideo(uri: string, name: string) {
   if (!(await Sharing.isAvailableAsync())) throw new Error('Sharing is not available on this device');
   const ext = extOf(uri);
 
+  const shareDir = getShareDir();
   // Clear the previous shared copy.
   try {
     if (shareDir.exists) shareDir.delete();

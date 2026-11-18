@@ -90,7 +90,8 @@ export type LibraryState = {
 };
 
 // Older builds kept everything in one JSON blob; it's imported once into SQLite.
-const legacyFile = new File(Paths.document, 'library.json');
+// Created lazily: modules must not touch native file APIs at import time (EAS evaluates them in Node).
+const legacyFile = () => new File(Paths.document, 'library.json');
 const LEGACY_KEY = 'reelbox/library/v1';
 const PERSIST_DEBOUNCE_MS = 800;
 
@@ -256,7 +257,7 @@ export async function hydrate() {
 async function importLegacy() {
   let raw: string | null = null;
   try {
-    if (legacyFile.exists) raw = await legacyFile.text();
+    if (legacyFile().exists) raw = await legacyFile().text();
     else raw = await AsyncStorage.getItem(LEGACY_KEY);
   } catch {}
   if (raw) {
@@ -272,7 +273,7 @@ async function importLegacy() {
       }));
       await flush();
       try {
-        if (legacyFile.exists) legacyFile.delete();
+        if (legacyFile().exists) legacyFile().delete();
       } catch {}
       AsyncStorage.removeItem(LEGACY_KEY).catch(() => {});
     } catch {}
